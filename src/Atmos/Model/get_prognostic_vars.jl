@@ -15,6 +15,9 @@ prognostic_vars(::RainSnowModel) = (Rain(), Snow())
 prognostic_vars(::NoTracers) = ()
 prognostic_vars(::NTracers{N}) where {N} = (Tracers{N}(),)
 
+prognostic_vars(::NoSGStke) = ()
+prognostic_vars(::SGStkeModel) = (SGSTKE(),)
+
 prognostic_vars(atmos::AtmosModel) = prognostic_vars(atmos.physics)
 
 prognostic_vars(m::AtmosPhysics) = (
@@ -25,6 +28,7 @@ prognostic_vars(m::AtmosPhysics) = (
     prognostic_vars(precipitation_model(m))...,
     prognostic_vars(tracer_model(m))...,
     prognostic_vars(turbconv_model(m))...,
+    prognostic_vars(sgstke_model(m))...,
 )
 
 get_prog_state(state, ::Mass) = (state, :ρ)
@@ -37,6 +41,7 @@ get_prog_state(state, ::IceMoisture) = (state.moisture, :ρq_ice)
 get_prog_state(state, ::Rain) = (state.precipitation, :ρq_rai)
 get_prog_state(state, ::Snow) = (state.precipitation, :ρq_sno)
 get_prog_state(state, ::Tracers{N}) where {N} = (state.tracers, :ρχ)
+get_prog_state(state, ::SGSTKE) = (state.sgstke, :ρe_SGS)
 
 get_specific_state(state, ::Mass) = (state, :ρ)
 get_specific_state(state, ::Momentum) = (state, :u)
@@ -48,5 +53,6 @@ get_specific_state(state, ::IceMoisture) = (state.moisture, :q_ice)
 get_specific_state(state, ::Rain) = (state.precipitation, :q_rai)
 get_specific_state(state, ::Snow) = (state.precipitation, :q_sno)
 get_specific_state(state, ::Tracers{N}) where {N} = (state.tracers, :χ)
+get_specific_state(state, ::SGSTKE) = (state.sgstke, :e_SGS)
 
 prognostic_vars(m::AtmosLinearModel) = (Mass(), Momentum(), Energy())

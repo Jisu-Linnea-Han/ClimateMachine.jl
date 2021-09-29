@@ -63,6 +63,7 @@ using ..Mesh.Grids:
 using ..Mesh.Filters: AbstractFilterTarget
 import ..Mesh.Filters:
     vars_state_filtered, compute_filter_argument!, compute_filter_result!
+import ..Mesh.Geometry: LocalGeometry, lengthscale
 
 using ..BalanceLaws
 using ClimateMachine.Problems
@@ -145,12 +146,14 @@ An `AtmosPhysics` for atmospheric physics
         radiation,
         tracers,
         lsforcing,
+        #spac,
+        SGStke,
     )
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct AtmosPhysics{FT, PS, RS, E, M, C, T, TC, HD, VS, P, R, TR, LF}
+struct AtmosPhysics{FT, PS, RS, E, M, C, T, TC, HD, VS, P, R, TR, LF, SGS}
     "Parameter Set (type to dispatch on, e.g., planet parameters. See CLIMAParameters.jl package)"
     param_set::PS
     "Reference State (For initial conditions, or for linearisation when using implicit solvers)"
@@ -177,6 +180,10 @@ struct AtmosPhysics{FT, PS, RS, E, M, C, T, TC, HD, VS, P, R, TR, LF}
     tracers::TR
     "Large-scale forcing (Forcing information from GCMs, reanalyses, or observations)"
     lsforcing::LF
+    #"SoilPlantAirContinum instance defined from Land module"
+    #spac::SPAC
+    "subgrid scale TKE"
+    sgstke::SGS
 end
 
 """
@@ -198,6 +205,8 @@ function AtmosPhysics{FT}(
     tracers = NoTracers(),
     lsforcing = NoLSForcing(),
     compressibility = Compressible(),
+    sgstke = NoSGStke(),
+    #spac = nothing
 ) where {FT <: AbstractFloat}
 
     args = (
@@ -214,6 +223,8 @@ function AtmosPhysics{FT}(
         radiation,
         tracers,
         lsforcing,
+        sgstke,
+        #spac
     )
     return AtmosPhysics{FT, typeof.(args)...}(args...)
 end
@@ -264,6 +275,8 @@ precipitation_model(atmos::AtmosModel) = precipitation_model(atmos.physics)
 radiation_model(atmos::AtmosModel) = radiation_model(atmos.physics)
 tracer_model(atmos::AtmosModel) = tracer_model(atmos.physics)
 lsforcing_model(atmos::AtmosModel) = lsforcing_model(atmos.physics)
+#spac_model(atmos::AtmosCanopyModel) = spac_model(atmos.physics)
+sgstke_model(atmos::AtmosModel) = sgstke_model(atmos.physics)
 
 parameter_set(physics::AtmosPhysics) = physics.param_set
 moisture_model(physics::AtmosPhysics) = physics.moisture
@@ -278,6 +291,8 @@ precipitation_model(physics::AtmosPhysics) = physics.precipitation
 radiation_model(physics::AtmosPhysics) = physics.radiation
 tracer_model(physics::AtmosPhysics) = physics.tracers
 lsforcing_model(physics::AtmosPhysics) = physics.lsforcing
+#spac_model(physics::AtmosCanopyPhysics) = physics.spac
+sgstke_model(atmos.physics) = physics.sgstke
 
 abstract type Compressibilty end
 
@@ -398,6 +413,7 @@ function vars_state(m::AtmosModel, st::Prognostic, FT)
         radiation::vars_state(radiation_model(m), st, FT)
         tracers::vars_state(tracer_model(m), st, FT)
         lsforcing::vars_state(lsforcing_model(m), st, FT)
+        sgstke::vars_state(SGStke_model(m), st, FT)
     end
 end
 
@@ -427,6 +443,7 @@ function vars_state(m::AtmosModel, st::Gradient, FT)
         lsforcing::vars_state(lsforcing_model(m), st, FT)
         precipitation::vars_state(precipitation_model(m), st, FT)
         tracers::vars_state(tracer_model(m), st, FT)
+        sgstke::vars_state(sgstke_model(m), st, FT)
     end
 end
 
@@ -445,6 +462,7 @@ function vars_state(m::AtmosModel, st::GradientFlux, FT)
         lsforcing::vars_state(lsforcing_model(m), st, FT)
         precipitation::vars_state(precipitation_model(m), st, FT)
         tracers::vars_state(tracer_model(m), st, FT)
+        sgstke::vars_state(sgstke_model(m), st, FT)
     end
 end
 
@@ -492,6 +510,8 @@ function vars_state(m::AtmosModel, st::Auxiliary, FT)
         tracers::vars_state(tracer_model(m), st, FT)
         radiation::vars_state(radiation_model(m), st, FT)
         lsforcing::vars_state(lsforcing_model(m), st, FT)
+        sgstke::vars_state(sgstke_model(m), st, FT)
+        # probably need to declare ecosystem fluxes here.
     end
 end
 
@@ -581,8 +601,9 @@ include("tendencies_energy.jl")       # specify energy tendencies
 include("tendencies_moisture.jl")     # specify moisture tendencies
 include("tendencies_precipitation.jl")# specify precipitation tendencies
 include("tendencies_tracers.jl")      # specify tracer tendencies
+include("tendencies_sgstke.jl") 
 
-include("problem.jl")
+include("problem.jl")                 # add for boundaryconditions.jl 
 include("ref_state.jl")
 include("moisture.jl")
 include("energy.jl")
@@ -591,6 +612,7 @@ include("thermo_states.jl")
 include("thermo_states_anelastic.jl")
 include("radiation.jl")
 include("tracers.jl")
+include("sgstke.jl")
 include("lsforcing.jl")
 include("linear.jl")
 include("courant.jl")
@@ -669,6 +691,15 @@ function compute_gradient_argument!(
         aux,
         t,
     )
+    # add for e_SGS
+    compute_gradient_argument!(
+        sgstke_model(atmos),
+        atmos,
+        transform,
+        state,
+        aux,
+        t,
+    )
 end
 
 function compute_gradient_flux!(
@@ -740,6 +771,15 @@ function compute_gradient_flux!(
         aux,
         t,
     )
+    compute_gradient_flux!(
+        sgstke_model(atmos),
+        atmos,
+        diffusive,
+        ∇transform,
+        state,
+        aux,
+        t,
+    )
 end
 
 function transform_post_gradient_laplacian!(
@@ -790,7 +830,7 @@ soundspeed_air(ts::ThermodynamicState, ::Compressible) = soundspeed_air(ts)
     vars_ws = Vars{vars_state(m, Prognostic(), FT)}(ws)
 
     wavespeed_tracers!(tracer_model(m), vars_ws, nM, state, aux, t)
-
+    wavespeed_sgstke!(sgstke_model(m), vars_ws, nM, state, aux, t)
     return ws
 end
 
@@ -840,6 +880,7 @@ function nodal_update_auxiliary_state!(
     atmos_nodal_update_auxiliary_state!(radiation_model(m), m, state, aux, t)
     atmos_nodal_update_auxiliary_state!(tracer_model(m), m, state, aux, t)
     turbconv_nodal_update_auxiliary_state!(turbconv_model(m), m, state, aux, t)
+    atmos_nodal_update_auxiliary_state!(sgstke_model(m), m, state, aux, t)
 end
 
 function integral_load_auxiliary_state!(
@@ -890,6 +931,7 @@ function atmos_nodal_init_state_auxiliary!(
     init_aux_hyperdiffusion!(hyperdiffusion_model(m), m, aux, geom)
     atmos_init_aux!(tracer_model(m), m, aux, geom)
     init_aux_turbconv!(turbconv_model(m), m, aux, geom)
+    atmos_init_aux!(sgstke_model(m), m, aux, geom)
     m.problem.init_state_auxiliary(m.problem, m, aux, geom)
 end
 
@@ -966,6 +1008,7 @@ end
 roe_average(ρ⁻, ρ⁺, var⁻, var⁺) =
     (sqrt(ρ⁻) * var⁻ + sqrt(ρ⁺) * var⁺) / (sqrt(ρ⁻) + sqrt(ρ⁺))
 
+# default numerical_flux_first_order for AtmosLESConfiguration is RusanovNumericalFlux()
 function numerical_flux_first_order!(
     numerical_flux::RoeNumericalFlux,
     balance_law::AtmosModel,
@@ -1015,6 +1058,7 @@ function numerical_flux_first_order!(
     ρ⁺ = state_prognostic⁺.ρ
     ρu⁺ = state_prognostic⁺.ρu
     ρe⁺ = state_prognostic⁺.energy.ρe
+    
 
     # TODO: state_auxiliary⁺ is not up-to-date
     # with state_prognostic⁺ on the boundaries
@@ -1073,6 +1117,21 @@ function numerical_flux_first_order!(
         wt = abs(ũᵀn) * (Δρχ - χ̃ * Δp / c̃^2)
 
         fluxᵀn.tracers.ρχ -= ((w1 + w2) * χ̃ + wt) / 2
+    end
+
+    if !(sgstke_model(balance_law) isa NoSGStke)
+        ρe_SGS⁻ = state_prognostic⁻.sgstke.ρe_SGS
+        e_SGS⁻ = ρe_SGS⁻ / ρ⁻
+
+        ρe_SGS⁺ = state_prognostic⁺.sgstke.ρe_SGS
+        e_SGS⁺ = ρe_SGS⁺ / ρ⁺
+
+        ẽ = roe_average(ρ⁻, ρ⁺, e_SGS⁻, e_SGS⁺)
+        Δρẽ = ρe_SGS⁺ - ρe_SGS⁻
+
+        wt = abs(ũᵀn) * (Δρẽ - ẽ * Δp / c̃^2)
+
+        fluxᵀn.sgstke.ρe_SGS -= ((w1 + w2) * ẽ + wt) / 2
     end
 end
 
@@ -1540,6 +1599,15 @@ function numerical_flux_first_order!(
         ρχ_b = u_half > FT(0) ? ρχ⁻ : ρχ⁺
         fluxᵀn.tracers.ρχ = ρχ_b * u_half
     end
+    if !(sgstke_model(balance_law) isa NoSGStke)
+        ρe_SGS⁻ = state_prognostic⁻.sgstke.ρe_SGS
+        e_SGS⁻ = ρe_SGS⁻ / ρ⁻
+        ρe_SGS⁺ = state_prognostic⁺.sgstke.ρe_SGS
+        e_SGS⁺ = ρe_SGS⁺ / ρ⁺
+        ρe_SGS_b = u_half > FT(0) ? ρe_SGS⁻ : ρe_SGS⁺
+        fluxᵀn.sgstke.ρe_SGS = ρe_SGS_b * u_half
+    end
 end
 
 end # module
+

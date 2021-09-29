@@ -59,6 +59,10 @@ eq_tends(
 eq_tends(pv::Tracers{N}, ::AtmosModel, ::Flux{FirstOrder}) where {N} =
     (Advect(),)
 
+# SGSTKE
+eq_tends(pv::SGSTKE, ::AtmosModel, ::Flux{FirstOrder}) =
+    (Advect(),)
+
 #####
 ##### Second order fluxes
 #####
@@ -115,3 +119,7 @@ eq_tends(
 # Tracers
 eq_tends(pv::Tracers{N}, m::AtmosModel, tt::Flux{SecondOrder}) where {N} =
     (eq_tends(pv, tracer_model(m), tt)...,)
+
+# SGSTKE
+eq_tends(pv::SGSTKE, m::AtmosModel, tt::Flux{SecondOrder}) =
+    (eq_tends(pv, sgstke_model(m), tt)...,)

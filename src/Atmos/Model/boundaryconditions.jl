@@ -18,8 +18,10 @@ export AtmosBC,
     PrescribedMoistureFlux,
     BulkFormulaMoisture,
     PrescribedTracerFlux,
-    NishizawaEnergyFlux
-
+    NishizawaEnergyFlux,
+    NoSGStkeFlux,
+    PrescribedSGStke,
+    PrescribedSGStkeFlux
 export average_density_sfc_int
 
 """
@@ -27,17 +29,19 @@ export average_density_sfc_int
             energy   = Insulating()
             moisture = Impermeable()
             precipitation = OutflowPrecipitation()
-            tracer  = ImpermeableTracer())
+            tracer  = ImpermeableTracer()
+            sgstke = NoSGStkeFlux())
 
 The standard boundary condition for [`AtmosModel`](@ref). The default options imply a "no flux" boundary condition.
 """
-struct AtmosBC{M, E, Q, P, TR, TC}
+struct AtmosBC{M, E, Q, P, TR, TC, SGS}
     momentum::M
     energy::E
     moisture::Q
     precipitation::P
     tracer::TR
     turbconv::TC
+    sgstke::SGS
 end
 
 function AtmosBC(
@@ -48,8 +52,9 @@ function AtmosBC(
     precipitation = OutflowPrecipitation(),
     tracer = ImpermeableTracer(),
     turbconv = NoTurbConvBC(),
+    sgstke = NoSGStkeFlux(),
 )
-    args = (momentum, energy, moisture, precipitation, tracer, turbconv)
+    args = (momentum, energy, moisture, precipitation, tracer, turbconv, sgstke)
     return AtmosBC{typeof.(args)...}(args...)
 end
 
@@ -107,6 +112,7 @@ function atmos_boundary_state!(nf, bc::AtmosBC, atmos, state⁺, args)
     )
     atmos_tracer_boundary_state!(nf, bc.tracer, atmos, state⁺, args)
     turbconv_boundary_state!(nf, bc.turbconv, atmos, state⁺, args)
+    atmos_sgstke_boundary_state!(nf, bc.sgstke, atmos, state⁺, args)
 end
 
 
@@ -182,6 +188,12 @@ function atmos_normal_boundary_flux_second_order!(
         args...,
     )
     turbconv_normal_boundary_flux_second_order!(nf, bc.turbconv, atmos, args...)
+    atmos_sgstke_normal_boundary_flux_second_order!(
+        nf,
+        bc.sgstke,
+        atmos,
+        args...,
+    )
 end
 
 """
@@ -201,3 +213,4 @@ include("bc_moisture.jl")
 include("bc_precipitation.jl")
 include("bc_initstate.jl")
 include("bc_tracer.jl")
+include("bc_sgstke.jl")
