@@ -275,7 +275,6 @@ precipitation_model(atmos::AtmosModel) = precipitation_model(atmos.physics)
 radiation_model(atmos::AtmosModel) = radiation_model(atmos.physics)
 tracer_model(atmos::AtmosModel) = tracer_model(atmos.physics)
 lsforcing_model(atmos::AtmosModel) = lsforcing_model(atmos.physics)
-#spac_model(atmos::AtmosCanopyModel) = spac_model(atmos.physics)
 sgstke_model(atmos::AtmosModel) = sgstke_model(atmos.physics)
 
 parameter_set(physics::AtmosPhysics) = physics.param_set
@@ -291,8 +290,7 @@ precipitation_model(physics::AtmosPhysics) = physics.precipitation
 radiation_model(physics::AtmosPhysics) = physics.radiation
 tracer_model(physics::AtmosPhysics) = physics.tracers
 lsforcing_model(physics::AtmosPhysics) = physics.lsforcing
-#spac_model(physics::AtmosCanopyPhysics) = physics.spac
-sgstke_model(atmos.physics) = physics.sgstke
+sgstke_model(physics::AtmosPhysics) = physics.sgstke
 
 abstract type Compressibilty end
 
@@ -413,7 +411,7 @@ function vars_state(m::AtmosModel, st::Prognostic, FT)
         radiation::vars_state(radiation_model(m), st, FT)
         tracers::vars_state(tracer_model(m), st, FT)
         lsforcing::vars_state(lsforcing_model(m), st, FT)
-        sgstke::vars_state(SGStke_model(m), st, FT)
+        sgstke::vars_state(sgstke_model(m), st, FT)
     end
 end
 

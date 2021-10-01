@@ -1,5 +1,8 @@
 ##### SGS TKE tendencies
-
+export ShearProduction,
+    BuoyancyProduction,
+    Dissipation
+    
 #####
 ##### First order flux (Advective)
 #####
@@ -7,23 +10,25 @@
 function flux(::SGSTKE, ::Advect, atmos, args)
     @unpack state = args
 
-    return state.ρu * state.sgstke.e_SGS
+    u = state.ρu .* (1/state.ρ)
+    return u .* state.sgstke.ρe_SGS 
 end
 
 #####
 ##### Second order flux (Diffusive)
 #####
-
+#=
 #struct SGSDiffFlux <: TendencyDef{Flux{SecondOrder}} end
 function flux(::SGSTKE, ::Diffusion, atmos, args)
     @unpack state, diffusive = args
     @unpack ν, D_t = args.precomputed.turbulence
 
     FT = eltype(state)
-    return  ( -FT(2) * ν * state.ρ ) .* diffusive.sgstke.∇e_SGS
-    # technically K_m instead of ν. Need to include this into TurbulenceClosures.
+    d_e_SGS = (-FT(2) * ν) .* diffusive.sgstke.∇e_SGS
+    return d_e_SGS * state.ρ    
+# technically K_m instead of ν. Need to include this into TurbulenceClosures.
 end
-
+=#
 #####
 ##### Sources (Productions and dissipation)
 #####
@@ -51,8 +56,8 @@ function source(::SGSTKE, ::BuoyancyProduction, atmos, args)
     # Deardorff 1980, for unsaturated air
     A = FT(1) + FT(0.61) * state.moisture.q_tot
     B = FT(0.61)
-    flux_θ_vir = A * flux_θ_liq_ice[3] + B * flux_q_t[3]
-    return (aux.orientation.∇Φ / aux.ref_state.T ) * flux_θ_vir
+    #flux_θ_vir = A * flux_θ_liq_ice[3] + B * flux_q_t[3]
+    return (aux.orientation.∇Φ / aux.ref_state.T ) #* flux_θ_vir
 end
 
 # The effective geometric mean grid resolution at the point
@@ -69,7 +74,7 @@ function source(::SGSTKE, ::Dissipation, atmos, args)
     Δs = aux.turbulence.Δ
     e = state.sgstke.ρe_SGS / state.ρ
 
-    flux_θ_liq_ice = state.ρ * (-D_t) .* diffusive.energy.∇θ_liq_ice
+    flux_θ_liq_ice = state.ρ * (-D_t) .* diffusive.energy.∇θ_liq_ice[3]
     l_s = FT(0.76) * sqrt(e) / sqrt((aux.orientation.∇Φ / aux.ref_state.T ) * flux_θ_liq_ice)
     l = (l_s < Δs) ? l_s : Δs
     C = FT(0.19) + FT(0.51) * (l / Δs)
