@@ -22,6 +22,7 @@ export AtmosModel,
     radiation_model,
     tracer_model,
     lsforcing_model,
+    sgstke_model,
     parameter_set
 
 using UnPack
@@ -147,7 +148,7 @@ An `AtmosPhysics` for atmospheric physics
         tracers,
         lsforcing,
         #spac,
-        SGStke,
+        sgstke,
     )
 
 # Fields
@@ -180,8 +181,6 @@ struct AtmosPhysics{FT, PS, RS, E, M, C, T, TC, HD, VS, P, R, TR, LF, SGS}
     tracers::TR
     "Large-scale forcing (Forcing information from GCMs, reanalyses, or observations)"
     lsforcing::LF
-    #"SoilPlantAirContinum instance defined from Land module"
-    #spac::SPAC
     "subgrid scale TKE"
     sgstke::SGS
 end
@@ -206,7 +205,6 @@ function AtmosPhysics{FT}(
     lsforcing = NoLSForcing(),
     compressibility = Compressible(),
     sgstke = NoSGStke(),
-    #spac = nothing
 ) where {FT <: AbstractFloat}
 
     args = (
@@ -224,7 +222,6 @@ function AtmosPhysics{FT}(
         tracers,
         lsforcing,
         sgstke,
-        #spac
     )
     return AtmosPhysics{FT, typeof.(args)...}(args...)
 end
@@ -509,7 +506,6 @@ function vars_state(m::AtmosModel, st::Auxiliary, FT)
         radiation::vars_state(radiation_model(m), st, FT)
         lsforcing::vars_state(lsforcing_model(m), st, FT)
         sgstke::vars_state(sgstke_model(m), st, FT)
-        # probably need to declare ecosystem fluxes here.
     end
 end
 
@@ -689,7 +685,6 @@ function compute_gradient_argument!(
         aux,
         t,
     )
-    # add for e_SGS
     compute_gradient_argument!(
         sgstke_model(atmos),
         atmos,
@@ -829,7 +824,7 @@ soundspeed_air(ts::ThermodynamicState, ::Compressible) = soundspeed_air(ts)
 
     wavespeed_tracers!(tracer_model(m), vars_ws, nM, state, aux, t)
     wavespeed_sgstke!(sgstke_model(m), vars_ws, nM, state, aux, t)
-    return ws
+    return ws #is this correct? Not sure...
 end
 
 
@@ -966,8 +961,9 @@ end
 function precompute(atmos::AtmosModel, args, tt::Source)
     ts = recover_thermo_state(atmos, args.state, args.aux)
     precipitation = precompute(precipitation_model(atmos), atmos, args, ts, tt)
+    turbulence = precompute(sgstke_model(atmos), atmos, args, ts, tt)
     turbconv = precompute(turbconv_model(atmos), atmos, args, ts, tt)
-    return (; ts, turbconv, precipitation)
+    return (; ts, turbulence, turbconv, precipitation)
 end
 
 """
