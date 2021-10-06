@@ -26,6 +26,7 @@ export AtmosModel,
     parameter_set
 
 using UnPack
+using Printf
 using DispatchedTuples
 using CLIMAParameters
 using CLIMAParameters.Planet: grav, cp_d, R_v, LH_v0, e_int_v0

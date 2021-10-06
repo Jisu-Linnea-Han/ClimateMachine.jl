@@ -26,13 +26,11 @@ function flux(::SGSTKE, ::Diffusion, atmos, args)
         """
         norm(∇e_SGS)         = %.16e
         norm(∇θ_liq_ice)         = %.16e
-        norm(∇u)         = %.16e
         norm(∇q_tot)         = %.16e
         """,
-        diffusive.sgstke.∇e_SGS,
-        diffusive.sgstke.∇θ_liq_ice,
-        diffusive.turbulence.∇u,
-        diffusive.moisture.∇q_tot
+	norm(diffusive.sgstke.∇e_SGS),
+        norm(diffusive.sgstke.∇θ_liq_ice),
+        norm(diffusive.moisture.∇q_tot)
     )
     FT = eltype(state)
     d_e_SGS = -FT(2) * ν * diffusive.sgstke.∇e_SGS
