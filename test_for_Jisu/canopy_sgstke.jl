@@ -329,7 +329,7 @@ function canopy_model(
     moisture_flux = LHF / FT(LH_v0(param_set))
 
     # Assemble source components
-    source_sgstke = (BuoyancyProduction(), Dissipation(),)
+    source_sgstke = (ShearProduction(), BuoyancyProduction(), Dissipation(),)
     source_default = (Gravity(), c_aero, source_sgstke...)
     if moisture_model == "dry"
         source = source_default
@@ -435,7 +435,7 @@ function main()
 
     t0 = FT(0)
     timeend = FT(600)
-    CFLmax = FT(1.7)     # use this for single-rate explicit LSRK144
+    CFLmax = FT(0.1)     # use this for single-rate explicit LSRK144
 
     # constants for struct Canopy
     c_d = FT(0.2)

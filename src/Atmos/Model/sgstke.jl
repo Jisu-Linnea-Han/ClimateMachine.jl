@@ -72,7 +72,7 @@ end
 vars_state(sgstke::SGStkeModel, ::Prognostic, FT) = @vars(ρe_SGS::FT)
 vars_state(sgstke::SGStkeModel, ::Gradient, FT) = @vars(e_SGS::FT, θ_liq_ice::FT)
 vars_state(sgstke::SGStkeModel, ::GradientFlux, FT) = 
-    @vars(∇e_SGS::SVector{3, FT}, ∇θ_liq_ice::SVector{3, FT})
+    @vars(∇e_SGS::SVector{3, FT}, ∇θ_liq_ice::SVector{3, FT}, ∇u::SMatrix{3, 3, FT, 9})
 vars_state(sgstke::SGStkeModel, ::Auxiliary, FT) = @vars(Δ::FT)
 
 function precompute(::SGStkeModel, atmos::AtmosModel, args, ts, ::Source) 
@@ -121,6 +121,7 @@ function compute_gradient_flux!(
 )
     diffusive.sgstke.∇e_SGS = ∇transform.sgstke.e_SGS
     diffusive.sgstke.∇θ_liq_ice = ∇transform.sgstke.θ_liq_ice
+    diffusive.sgstke.∇u = ∇transform.u
 end
 
 # AtmosLESConfigType's default numerical_flux_first_order is RusanovNumericalFlux(), 
