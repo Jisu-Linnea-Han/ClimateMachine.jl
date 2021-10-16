@@ -688,7 +688,7 @@ function compute_gradient_argument!(
     )
     compute_gradient_argument!(
         sgstke_model(atmos),
-        atmos,
+	atmos,
         transform,
         state,
         aux,
@@ -767,7 +767,6 @@ function compute_gradient_flux!(
     )
     compute_gradient_flux!(
         sgstke_model(atmos),
-        atmos,
         diffusive,
         ∇transform,
         state,

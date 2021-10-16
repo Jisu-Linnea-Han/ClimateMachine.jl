@@ -45,11 +45,11 @@ end
 
 function compute_gradient_argument!(
     ::AbstractSGStkeModel,
-    atmos::AtmosModel,
-    transform,
-    state,
-    aux,
-    t,
+    m::AtmosModel,
+    transform::Vars,
+    state::Vars,
+    aux::Vars,
+    t::Real,
 )
     nothing
 end
@@ -82,25 +82,26 @@ function precompute(::SGStkeModel, atmos::AtmosModel, args, ts, ::Source)
     return turbulence
 end
 
-function atmos_init_aux!(
+@inline function atmos_init_aux!(
     ::SGStkeModel,
     ::AtmosModel,
     aux::Vars,
     geom::LocalGeometry,
 )
     aux.sgstke.Δ = lengthscale(geom)
+    nothing
 end
 
 """
 Set the variable to take the gradient of.
 """
 function compute_gradient_argument!(
-    e_SGS::SGStkeModel,
+    ::SGStkeModel,
     atmos::AtmosModel,
-    transform,
-    state,
-    aux,
-    t,
+    transform::Vars,
+    state::Vars,
+    aux::Vars,
+    t::Real,
 )
     transform.sgstke.e_SGS = state.sgstke.ρe_SGS * (1 / state.ρ)
     ts = recover_thermo_state(atmos, state, aux)
@@ -113,11 +114,11 @@ Compute the gradient of the variable.
 """
 function compute_gradient_flux!(
     ::SGStkeModel,
-    diffusive, #auxDG
-    ∇transform,#gradvars
-    state,
-    aux,
-    t,
+    diffusive::Vars,
+    ∇transform::Grad,
+    state::Vars,
+    aux::Vars,
+    t::Real,
 )
     diffusive.sgstke.∇e_SGS = ∇transform.sgstke.e_SGS
     diffusive.sgstke.∇θ_liq_ice = ∇transform.sgstke.θ_liq_ice

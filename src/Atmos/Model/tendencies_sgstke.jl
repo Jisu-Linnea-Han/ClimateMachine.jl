@@ -22,18 +22,6 @@ function flux(::SGSTKE, ::Diffusion, atmos, args)
     @unpack state, diffusive = args
     @unpack ν, D_t = args.precomputed.turbulence
 
-    @info @sprintf(
-        """
-        norm(∇e_SGS)         = %.16e
-        norm(∇θ_liq_ice)         = %.16e
-        norm(∇q_tot)         = %.16e
-	norm(∇u)       = %.16e
-        """,
-	norm(diffusive.sgstke.∇e_SGS),
-        norm(diffusive.sgstke.∇θ_liq_ice),
-        norm(diffusive.moisture.∇q_tot),
-	norm(diffusive.sgstke.∇u)
-    )
     FT = eltype(state)
     d_e_SGS = -FT(2) * diag(ν) .* diffusive.sgstke.∇e_SGS
     return d_e_SGS * state.ρ
