@@ -323,7 +323,7 @@ function canopy_model(
     ref_state = HydrostaticState(temp_profile_ref)
 
     C_drag = FT(0.0011)
-    _C_smag = FT(C_smag(param_set))
+    #_C_smag = FT(C_smag(param_set))
     LHF = FT(50) # Latent heat flux
     SHF = FT(15) # Sensible heat flux
     moisture_flux = LHF / FT(LH_v0(param_set))
@@ -360,7 +360,7 @@ function canopy_model(
     physics = AtmosPhysics{FT}(
         param_set;
         ref_state = ref_state,
-        turbulence = SmagorinskyLilly(_C_smag),
+        turbulence = Deardorff(), #SmagorinskyLilly(_C_smag),
         moisture = moisture,
         tracers = tracers,
         turbconv = turbconv,

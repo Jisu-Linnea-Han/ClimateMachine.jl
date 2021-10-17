@@ -9,6 +9,7 @@ viscosity terms, diffusivity and stress tensors.
 - [`SmagorinskyLilly`](@ref)
 - [`Vreman`](@ref)
 - [`AnisoMinDiss`](@ref)
+- [`Deardorff`](@ref)
 
 """
 module TurbulenceClosures
@@ -18,6 +19,7 @@ using LinearAlgebra
 using StaticArrays
 using UnPack
 import CLIMAParameters: AbstractParameterSet
+using CLIMAParameters.Planet: grav
 using CLIMAParameters.Atmos.SubgridScale: inv_Pr_turb
 
 using ClimateMachine
@@ -42,6 +44,7 @@ export TurbulenceClosureModel,
     SmagorinskyLilly,
     Vreman,
     AnisoMinDiss,
+    Deardorff,
     HyperDiffusion,
     NoHyperDiffusion,
     DryBiharmonic,
@@ -115,6 +118,7 @@ function compute_gradient_argument!(
     aux::Vars,
     t::Real,
 ) end
+
 """
     compute_gradient_flux!(::TurbulenceClosureModel, _...)
 Post-gradient-transformed variables specific to turbulence models.
@@ -588,7 +592,7 @@ function turbulence_tensors(
     ν_v = k̂ .* dot(ν, k̂)
     ν_h = ν₀ .- ν_v
     ν = SDiagonal(ν_h + ν_v .* f_b²)
-    D_t = diag(ν) * _inv_Pr_turb
+    D_t = ν * _inv_Pr_turb
     τ = -2 * ν * S
     return ν, D_t, τ
 end
@@ -684,6 +688,66 @@ function turbulence_tensors(
     ν_h = ν₀ .- ν_v
     ν = SDiagonal(ν_h + ν_v .* f_b²)
     D_t = diag(ν) * _inv_Pr_turb
+    τ = -2 * ν * S
+    return ν, D_t, τ
+end
+
+"""
+    Deardorff <: TurbulenceClosureModel
+    # TKE based closure
+    See [Deardorff1980]
+"""
+struct Deardorff <: TurbulenceClosureModel end
+
+vars_state(::Deardorff, ::Auxiliary, FT) = @vars(Δ::FT)
+vars_state(::Deardorff, ::Gradient, FT) = @vars()
+vars_state(::Deardorff, ::GradientFlux, FT) = @vars(S::SHermitianCompact{3, FT, 6})
+
+function init_aux_turbulence!(
+    ::Deardorff,
+    ::BalanceLaw,
+    aux::Vars,
+    geom::LocalGeometry,
+)
+    aux.turbulence.Δ = lengthscale(geom)
+end
+
+
+function compute_gradient_flux!(
+    ::Deardorff,
+    orientation::Orientation,
+    diffusive::Vars,
+    ∇transform::Grad,
+    state::Vars,
+    aux::Vars,
+    t::Real,
+)
+
+    diffusive.turbulence.S = symmetrize(∇transform.u)
+end
+
+function turbulence_tensors(
+    ::Deardorff,
+    orientation::Orientation,
+    param_set::AbstractParameterSet,
+    state::Vars,
+    diffusive::Vars,
+    aux::Vars,
+    t::Real,
+)
+
+    FT = eltype(state)
+    S = diffusive.turbulence.S
+
+    Δs = aux.turbulence.Δ
+    e = state.sgstke.ρe_SGS / state.ρ
+    g = FT(grav(param_set))
+
+    l_s = FT(0.76) * sqrt(e) / sqrt(abs((g / aux.ref_state.T ) * diffusive.sgstke.∇θ_liq_ice[3]))
+    l = (l_s < Δs) ? l_s : Δs
+
+    ν = FT(0.1) * l * sqrt(e)
+    D_t = ( FT(1) + FT(2) * l / Δs ) * ν
     τ = -2 * ν * S
     return ν, D_t, τ
 end

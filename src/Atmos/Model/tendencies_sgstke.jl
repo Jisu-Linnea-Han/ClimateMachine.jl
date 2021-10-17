@@ -23,7 +23,8 @@ function flux(::SGSTKE, ::Diffusion, atmos, args)
     @unpack ν, D_t = args.precomputed.turbulence
 
     FT = eltype(state)
-    d_e_SGS = -FT(2) * diag(ν) .* diffusive.sgstke.∇e_SGS
+    K_m = (ν isa SDiagonal) ? diag(ν) : ν
+    d_e_SGS = -FT(2) * K_m .* diffusive.sgstke.∇e_SGS
     return d_e_SGS * state.ρ
     # technically K_m instead of ν. Need to include this into TurbulenceClosures.
 end
@@ -52,8 +53,9 @@ function source(::SGSTKE, ::BuoyancyProduction, atmos, args)
     FT = eltype(state)
     g = FT(grav(param_set))
 
-    flux_θ_liq_ice = state.ρ * (-D_t) .* diffusive.sgstke.∇θ_liq_ice
-    flux_q_t = state.ρ * (-D_t) .* diffusive.moisture.∇q_tot
+    K_h = D_t # could be FT or SVector{3, FT}
+    flux_θ_liq_ice = state.ρ * (-K_h) .* diffusive.sgstke.∇θ_liq_ice
+    flux_q_t = state.ρ * (-K_h) .* diffusive.moisture.∇q_tot
 
     # Deardorff 1980, for unsaturated air
     A = FT(1) + FT(0.61) * state.moisture.ρq_tot / state.ρ
@@ -80,8 +82,7 @@ function source(::SGSTKE, ::Dissipation, atmos, args)
     Δs = aux.turbulence.Δ
     e = state.sgstke.ρe_SGS / state.ρ
 
-    flux_θ_liq_ice = state.ρ * (-D_t) .* diffusive.sgstke.∇θ_liq_ice
-    l_s = FT(0.76) * sqrt(e) / sqrt(abs((g / aux.ref_state.T ) * flux_θ_liq_ice[3]))
+    l_s = FT(0.76) * sqrt(e) / sqrt(abs((g / aux.ref_state.T ) * diffusive.sgstke.∇θ_liq_ice[3]))
     l = (l_s < Δs) ? l_s : Δs
     C = FT(0.19) + FT(0.51) * (l / Δs)
     return - state.ρ * C * e^FT(1.5) / l
